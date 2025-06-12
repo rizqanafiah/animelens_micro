@@ -3,7 +3,6 @@ import numpy as np
 import tensorflow as tf
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-import cv2
 from PIL import Image
 import io
 
@@ -26,14 +25,10 @@ IMAGE_SIZE = (224, 224)
 
 def preprocess_image(image):
     try:
-        # Convert to PIL Image
-        if isinstance(image, np.ndarray):
-            image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-        
         # Resize using PIL with BILINEAR interpolation
         image = image.resize(IMAGE_SIZE, Image.BILINEAR)
         
-        # Convert back to numpy array
+        # Convert to numpy array
         image = np.array(image)
         
         # Normalize pixel values
@@ -54,13 +49,16 @@ async def root():
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     try:
-        # Read and decode the image
+        # Read and decode the image using Pillow
         contents = await file.read()
-        nparr = np.frombuffer(contents, np.uint8)
-        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        image = Image.open(io.BytesIO(contents))
         
         if image is None:
             return {"success": False, "error": "Invalid image file"}
+        
+        # Convert to RGB if image is in different mode
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
         
         # Preprocess the image
         processed_image = preprocess_image(image)
